@@ -1,0 +1,29 @@
+# Environment / secrets
+.env
+.env.local
+*.key
+
+# Candidate data — NEVER commit resumes or generated reports
+uploads/*
+!uploads/.gitkeep
+outputs/*
+!outputs/.gitkeep
+# Sample reports generated from the fictional sample data are committed as
+# reference output. Real candidate reports are still excluded.
+!outputs/sample_candidate_ranking.xlsx
+!outputs/sample_candidate_report.docx
+.cache/
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

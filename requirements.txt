@@ -1,0 +1,19 @@
+streamlit>=1.50
+pandas>=2.0
+openpyxl>=3.1
+python-docx>=1.1
+pymupdf>=1.24
+pdfplumber>=0.11
+python-dotenv>=1.0
+rapidfuzz>=3.6
+
+# LLM providers (install the one you use; both are safe to keep)
+anthropic>=0.40
+openai>=1.40
+
+# Optional OCR for scanned/image-based PDFs.
+# Also requires the Tesseract binary:
+#   Debian/Ubuntu: sudo apt-get install tesseract-ocr
+#   macOS:         brew install tesseract
+pytesseract>=0.3.10
+Pillow>=10.0

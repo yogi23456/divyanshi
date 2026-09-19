@@ -1,0 +1,25 @@
+SCORING RUBRIC — maximum points per category (weights are recruiter-configurable,
+so use the maximums given below rather than any default you may remember):
+
+{{CATEGORY_TABLE}}
+
+Band guidance, applied to each category as a proportion of its maximum:
+  90-100%  Evidence directly and repeatedly demonstrates the requirement, at the
+           depth and seniority the JD asks for.
+  70-89%   Evidence clearly demonstrates the requirement, with a minor gap in
+           depth, recency or scale.
+  50-69%   Partially relevant evidence, or an adjacent/transferable equivalent
+           the context supports.
+  25-49%   Weak or indirect evidence only (for example a bare skills-list
+           mention with nothing behind it).
+  0-24%    No supporting evidence in the resume.
+
+Additional rules:
+  - Years of experience: compare only against a minimum the JD actually states.
+    If the JD states none, do not penalise the candidate on duration.
+  - If the resume does not state total experience and it cannot be derived from
+    employment dates written in the resume, record that under
+    missing_information and score on the demonstrated evidence you do have.
+  - Certifications count towards Education only where the JD asks for them or
+    they are clearly relevant to the role.
+  - Preferred requirements can never make up for a missed mandatory requirement.
