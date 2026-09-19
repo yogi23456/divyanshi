@@ -176,6 +176,36 @@ Google Ads, Meta Ads, GA4, SQL, CRO, A/B testing, programmatic, lifecycle market
 """
 
 
+# Rendered to an image and embedded in a PDF with no text layer, so it can only
+# be read via OCR. Exercises the scanned-document path.
+RESUME_SCANNED = """PRIYA RAGHAVAN
+priya.raghavan@example.com | +91 98111 22334 | Bengaluru
+
+PROFESSIONAL SUMMARY
+Performance marketing lead with 6 years of experience scaling paid
+acquisition for consumer subscription products.
+
+WORK EXPERIENCE
+
+Performance Marketing Lead | BrightPath Learning | Apr 2020 - Present
+- Owned paid acquisition across Google Ads and Meta Ads with a monthly
+  budget of INR 90 lakh.
+- Reduced cost per enrolment by 28% while growing qualified leads 1.9x.
+- Ran continuous A/B testing on landing pages and ad creatives.
+- Reported CAC and ROAS to leadership weekly using GA4.
+
+Digital Marketing Executive | Vertex Retail | Jun 2018 - Mar 2020
+- Ran paid search campaigns for an ecommerce marketplace.
+
+EDUCATION
+MBA, Marketing - Christ University, 2018
+B.Sc Statistics - Bangalore University, 2016
+
+SKILLS
+Google Ads, Meta Ads, GA4, SQL, A/B testing, conversion rate optimization
+"""
+
+
 def write_txt(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
     print(f"  wrote {path.relative_to(ROOT)}")
@@ -197,6 +227,53 @@ def write_pdf(path: Path, text: str) -> None:
     doc.save(str(path))
     doc.close()
     print(f"  wrote {path.relative_to(ROOT)} ({len(lines) // 52 + 1} page(s))")
+
+
+def write_scanned_pdf(path: Path, text: str) -> None:
+    """Render text to an image and wrap it in a PDF with NO text layer.
+
+    This is what a scanned resume looks like to the parser: the only way to read
+    it is OCR.
+    """
+    import io
+
+    from PIL import Image, ImageDraw, ImageFont
+
+    try:
+        import pymupdf
+    except ImportError:  # pragma: no cover
+        import fitz as pymupdf
+
+    width, height = 1240, 1754  # A4 at 150 dpi
+    image = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(image)
+
+    font = None
+    for candidate in ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                      "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                      "/Library/Fonts/Arial.ttf"):
+        if Path(candidate).exists():
+            font = ImageFont.truetype(candidate, 26)
+            break
+    if font is None:  # pragma: no cover - last resort, OCR quality will suffer
+        font = ImageFont.load_default()
+        print("  WARNING: no TrueType font found; scanned sample may OCR poorly")
+
+    y = 70
+    for line in text.split("\n"):
+        draw.text((70, y), line, fill="black", font=font)
+        y += 36
+
+    # JPEG keeps the sample small enough to commit.
+    buffer = io.BytesIO()
+    image.convert("RGB").save(buffer, format="JPEG", quality=72, optimize=True)
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    page.insert_image(pymupdf.Rect(0, 0, 595, 842), stream=buffer.getvalue())
+    doc.save(str(path))
+    doc.close()
+    print(f"  wrote {path.relative_to(ROOT)} (image-only, no text layer)")
 
 
 def write_docx(path: Path, text: str) -> None:
@@ -225,6 +302,7 @@ def main() -> None:
     write_docx(RESUMES / "unnamed_candidate_resume.docx", RESUME_NO_NAME)
     # Same content as anjali_mehta_resume.pdf in a different format -> duplicate detection.
     write_docx(RESUMES / "anjali_mehta_resume_copy.docx", RESUME_STRONG)
+    write_scanned_pdf(RESUMES / "scanned_resume.pdf", RESUME_SCANNED)
 
     print("Edge cases:")
     corrupt = RESUMES / "corrupted_resume.pdf"

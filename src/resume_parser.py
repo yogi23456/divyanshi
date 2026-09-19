@@ -19,6 +19,7 @@ from typing import Dict, List, Optional
 from .config import NOT_MENTIONED
 from .utils import (
     content_hash,
+    dewrap_lines,
     estimate_years_from_dates,
     extract_candidate_name,
     extract_total_years,
@@ -490,7 +491,10 @@ def parse_resume(file_name: str, data: bytes, fallback_name: str = "Candidate") 
         result.candidate_name = fallback_name
         return result
 
-    text = normalize_text(raw_text)
+    # Re-join lines that the source layout split mid-sentence. PDF extraction and
+    # OCR both wrap long bullets across several lines, which would otherwise cut
+    # evidence quotes off halfway through.
+    text = dewrap_lines(normalize_text(raw_text))
     if len(text) < MIN_TOTAL_CHARS:
         result.status = "failed"
         result.error = "Empty resume — no usable text could be extracted."

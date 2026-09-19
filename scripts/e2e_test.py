@@ -139,8 +139,10 @@ def main() -> int:
     by_name = {e.file_name: e for e in evaluations}
     processed = [e for e in evaluations if e.ok]
 
+    expected_processed = sum(1 for r in parsed if r.ok)
     check("Every uploaded file appears in the results", len(evaluations) == len(files))
-    check("All processable candidates were analysed", len(processed) == 4, str(len(processed)))
+    check("All processable candidates were analysed",
+          len(processed) == expected_processed, f"{len(processed)} vs {expected_processed}")
     check("Nobody is hidden — failures are listed with a reason",
           all(e.recommendation_reason or e.error for e in evaluations if not e.ok))
 
@@ -253,15 +255,53 @@ def main() -> int:
 
     summary = build_summary(evaluations, len(files))
     check("Summary counts uploads", summary["total_uploaded"] == len(files))
-    check("Summary counts processed", summary["processed"] == 4)
+    check("Summary counts processed", summary["processed"] == expected_processed)
     check("Summary counts failures", summary["failed"] == 3, str(summary["failed"]))
     check("Summary counts duplicates", summary["duplicates"] == 1)
     check("Summary reports score statistics",
           summary["highest_score"] >= summary["average_score"] >= summary["lowest_score"])
     check("Summary lists top candidates", len(summary["top_candidates"]) >= 3)
 
+    # ------------------------------------------------------------------- OCR
+    section("8. Scanned / image-based PDF (OCR)")
+    scanned = by_file["scanned_resume.pdf"]
+    ocr_available = _ocr_available()
+    print(f"  (Tesseract {'detected' if ocr_available else 'NOT installed'})")
+
+    check("Scanned PDF has no text layer (it is genuinely an image)",
+          _pdf_text_layer_empty(samples / "resumes" / "scanned_resume.pdf"))
+
+    if ocr_available:
+        check("Scanned PDF processed via OCR",
+              scanned.ok and "ocr" in scanned.extraction_method, 
+              f"status={scanned.status} method={scanned.extraction_method}")
+        check("OCR extracted the candidate name",
+              scanned.candidate_name == "Priya Raghavan", scanned.candidate_name)
+        check("OCR extracted years of experience", scanned.total_years == 6.0,
+              str(scanned.total_years))
+        check("OCR extracted skills", len(scanned.skills) >= 4, str(scanned.skills))
+        check("OCR extracted education", len(scanned.education) >= 2, str(scanned.education))
+        check("OCR extracted employers", len(scanned.companies) >= 2, str(scanned.companies))
+        check("Wrapped lines are re-joined, so evidence quotes are not truncated",
+              any("budget of INR 90 lakh" in r for r in scanned.responsibilities),
+              str(scanned.responsibilities[:1]))
+        scanned_eval = by_name["scanned_resume.pdf"]
+        check("OCR'd candidate is scored like any other",
+              scanned_eval.ok and scanned_eval.overall_score > 0 and scanned_eval.rank > 0,
+              f"score={scanned_eval.overall_score} rank={scanned_eval.rank}")
+        check("OCR'd candidate's evidence traces back to the OCR text",
+              all(_quote_in_resume(q, scanned.text)
+                  for v in scanned_eval.requirement_verdicts for q in v.evidence))
+    else:
+        check("Without OCR installed, the scanned PDF is flagged, never guessed at",
+              scanned.status == "ocr_required" and not scanned.text,
+              f"status={scanned.status}")
+        check("The flag explains what is needed",
+              "ocr" in scanned.error.lower() or "scanned" in scanned.error.lower(),
+              scanned.error)
+
     # ------------------------------------------------------- bias and fairness
-    section("8. Bias and fairness")
+    section("9. Bias and fairness")
     # Word-boundary matching: a substring test would flag "landing page" and
     # "manage" for containing "age".
     sensitive = ["gender", "male", "female", "religion", "caste", "race", "ethnicity",
@@ -282,7 +322,7 @@ def main() -> int:
                             " ".join(q for e in processed for q in e.evidence).lower())])
 
     # --------------------------------------------------------------- exports
-    section("9. Exports")
+    section("10. Exports")
     outputs = ROOT / "outputs"
     xlsx_path = export_to_excel(evaluations, summary, weights,
                                 outputs / "sample_candidate_ranking.xlsx", jd=jd,
@@ -356,6 +396,28 @@ def main() -> int:
               f"{evaluation.candidate_name:22}  {evaluation.file_name}")
     print(f"\nGenerated:\n  {xlsx_path}\n  {docx_path}")
     return 0
+
+
+def _ocr_available() -> bool:
+    """True when both the Python bindings and the Tesseract binary are present."""
+    try:
+        import pytesseract
+        from PIL import Image  # noqa: F401
+
+        pytesseract.get_tesseract_version()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _pdf_text_layer_empty(path: Path) -> bool:
+    try:
+        import pymupdf
+    except ImportError:  # pragma: no cover
+        import fitz as pymupdf
+
+    with pymupdf.open(str(path)) as doc:
+        return not "".join(page.get_text("text") for page in doc).strip()
 
 
 def unnamed_eval(by_name):

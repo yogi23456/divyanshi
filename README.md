@@ -85,6 +85,11 @@ Without it, scanned PDFs are flagged **"OCR required"** rather than skipped
 silently or guessed at. Nothing is ever invented for a resume that could not be
 read.
 
+Both paths are covered by the test suite: `samples/resumes/scanned_resume.pdf`
+is a real image-only PDF (asserted to have no text layer), and the suite checks
+that OCR recovers the name, experience, skills, education and employers when
+Tesseract is present, and that the file is flagged with empty text when it is not.
+
 ---
 
 ## Environment variables
@@ -435,6 +440,7 @@ takes down a batch:
 | Unsupported format | Rejected with the list of supported formats |
 | Missing candidate name | Falls back to `Candidate 001`; **processing always continues** |
 | Duplicate resume | Flagged, linked to the original, not scored twice (detected across formats via a text fingerprint) |
+| Line-wrapped bullets (PDF/OCR) | Re-joined before parsing, so evidence quotes are never cut off mid-sentence |
 | LLM API failure | Retried with exponential backoff, then falls back to the offline engine, with a note on the evaluation |
 | API rate limit | Client-side token-bucket limiter plus retry-with-backoff |
 | Malformed LLM JSON | One stricter retry, then the offline engine |
@@ -513,10 +519,10 @@ python scripts/generate_samples.py   # build the sample data
 python scripts/e2e_test.py           # run the full pipeline
 ```
 
-The suite runs 107 checks across configuration, JD parsing, resume parsing,
+The suite runs 117 checks across configuration, JD parsing, resume parsing,
 caching, analysis, scoring correctness, evidence traceability, weight
-reconfiguration, search, filtering, ranking, bias, and both export formats. It
-exits non-zero on any failure.
+reconfiguration, OCR, search, filtering, ranking, bias, and both export formats.
+It exits non-zero on any failure.
 
 Notable assertions:
 
@@ -525,6 +531,9 @@ Notable assertions:
   verified to exist in the resume text** — nothing is generated
 - A corrupted PDF, an empty file and a near-empty resume are each flagged rather
   than crashing the batch
+- A genuinely scanned PDF (image only, verified to have no text layer) is read
+  via OCR and scored like any other candidate; with Tesseract absent the same
+  file is flagged `ocr_required` with empty text, proving nothing is invented
 - A resume with no extractable name still processes, as `Candidate NNN`
 - A duplicate is detected across *different file formats*
 - Re-weighting changes both the category maximums and the overall score
