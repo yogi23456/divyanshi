@@ -91,9 +91,20 @@ class ParsedResume:
 # ---------------------------------------------------------------------------
 
 def _extract_pdf(data: bytes) -> tuple[str, int, str]:
-    """Extract text from a PDF, preferring PyMuPDF and falling back to pdfplumber."""
+    """Extract text from a PDF using every available engine, best result wins.
+
+    Both engines are tried whenever the first one comes back thin. A PDF is only
+    called "scanned" once every engine has failed to find a text layer —
+    otherwise one engine returning nothing (which happens on some builds and
+    some PDF producers) would send a perfectly readable document to OCR.
+    """
+    attempts: list[tuple[str, int, str]] = []   # (text, pages, method)
     last_error: Optional[Exception] = None
 
+    def substantive(text: str) -> bool:
+        return len(normalize_text(text)) >= MIN_TOTAL_CHARS
+
+    # --- Engine 1: PyMuPDF ---
     try:
         import pymupdf  # type: ignore
     except ImportError:  # pragma: no cover - older wheels expose `fitz` only
@@ -111,22 +122,35 @@ def _extract_pdf(data: bytes) -> tuple[str, int, str]:
                         raise ResumeParseError(
                             "Password-protected PDF — cannot be read without the password.")
                 pages = [page.get_text("text") or "" for page in doc]
-                return "\n".join(pages), len(pages), "pymupdf"
+                text = "\n".join(pages)
+                if substantive(text):
+                    return text, len(pages), "pymupdf"
+                attempts.append((text, len(pages), "pymupdf"))
         except ResumeParseError:
             raise
-        except Exception as exc:  # noqa: BLE001 - fall through to pdfplumber
+        except Exception as exc:  # noqa: BLE001 - try the next engine
             last_error = exc
             logger.debug("PyMuPDF extraction failed: %s", exc)
 
+    # --- Engine 2: pdfplumber ---
     try:
         import pdfplumber  # type: ignore
 
         with pdfplumber.open(io.BytesIO(data)) as pdf:
             pages = [(page.extract_text() or "") for page in pdf.pages]
-            return "\n".join(pages), len(pages), "pdfplumber"
+            text = "\n".join(pages)
+            if substantive(text):
+                return text, len(pages), "pdfplumber"
+            attempts.append((text, len(pages), "pdfplumber"))
     except Exception as exc:  # noqa: BLE001
         last_error = exc
         logger.debug("pdfplumber extraction failed: %s", exc)
+
+    if attempts:
+        # Every engine ran but none found much. Hand back the best of them and
+        # let the caller decide whether this is a scan or simply a sparse file.
+        best = max(attempts, key=lambda a: len(normalize_text(a[0])))
+        return best
 
     message = str(last_error) if last_error else "unknown error"
     if "password" in message.lower() or "encrypt" in message.lower():
@@ -165,7 +189,10 @@ def _ocr_pdf(data: bytes) -> tuple[str, str]:
         pytesseract.get_tesseract_version()
     except Exception:  # noqa: BLE001
         raise ResumeParseError(
-            "Scanned/image-based PDF. The Tesseract binary is not installed on this machine.",
+            "No text layer found, so this looks like a scanned/image-based PDF, and OCR is "
+            "unavailable (the Tesseract binary is not installed). If this file does show "
+            "selectable text when you open it, re-save or re-export it as a PDF and try "
+            "again; otherwise install Tesseract to enable OCR.",
             status="ocr_required",
         )
 

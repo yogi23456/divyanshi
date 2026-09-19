@@ -532,12 +532,33 @@ prompts/
 scripts/
   generate_samples.py         Build the sample JD and resumes
   e2e_test.py                 Full pipeline test
+  diagnose.py                 Environment + single-file troubleshooting
 
 samples/                      Sample JD + 8 resumes (incl. deliberate edge cases)
 uploads/  outputs/  .cache/   Runtime data (gitignored)
 ```
 
 ---
+
+## Troubleshooting
+
+If a file will not parse and the reason is not obvious, run the diagnostic. It
+reports which extraction engines are available and walks one file through the
+real pipeline:
+
+```bash
+python scripts/diagnose.py                       # environment only
+python scripts/diagnose.py path/to/your_file.pdf # environment + that file
+```
+
+Common cases:
+
+| Symptom | Cause and fix |
+| --- | --- |
+| "looks like a scanned/image-based PDF" on a PDF whose text you *can* select | Both extraction engines found no text layer. Some PDF producers write text in a way neither engine reads. Re-save or re-export the file as a PDF (opening and re-printing to PDF usually fixes it), or install Tesseract to OCR it. |
+| Same message on a genuine scan | Expected. Install Tesseract (see [Installation](#installation)) to read it. |
+| "Corrupted or unreadable PDF" | The file is damaged or not really a PDF. Re-download or re-export it. |
+| Streamlit asks for an email on first run | Its one-time welcome prompt. Press Enter with the field blank. `run.sh` / `run.bat` suppress it for you. |
 
 ## Testing
 
@@ -546,7 +567,7 @@ python scripts/generate_samples.py   # build the sample data
 python scripts/e2e_test.py           # run the full pipeline
 ```
 
-The suite runs 117 checks across configuration, JD parsing, resume parsing,
+The suite runs 118 checks across configuration, JD parsing, resume parsing,
 caching, analysis, scoring correctness, evidence traceability, weight
 reconfiguration, OCR, search, filtering, ranking, bias, and both export formats.
 It exits non-zero on any failure.

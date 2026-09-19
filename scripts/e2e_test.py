@@ -268,6 +268,9 @@ def main() -> int:
     ocr_available = _ocr_available()
     print(f"  (Tesseract {'detected' if ocr_available else 'NOT installed'})")
 
+    check("A PDF is only called scanned after EVERY engine finds no text",
+          _survives_dead_primary_engine(samples / "job_description.pdf"),
+          "a text PDF was misreported as scanned when the primary engine returned nothing")
     check("Scanned PDF has no text layer (it is genuinely an image)",
           _pdf_text_layer_empty(samples / "resumes" / "scanned_resume.pdf"))
 
@@ -396,6 +399,50 @@ def main() -> int:
               f"{evaluation.candidate_name:22}  {evaluation.file_name}")
     print(f"\nGenerated:\n  {xlsx_path}\n  {docx_path}")
     return 0
+
+
+def _survives_dead_primary_engine(pdf_path: Path) -> bool:
+    """Regression guard: if PyMuPDF returns empty text without raising, the
+    second engine must still recover the document instead of the file being
+    misdiagnosed as a scan and sent to OCR."""
+    import sys as _sys
+    import types
+
+    from src.resume_parser import _extract_pdf
+
+    class _DeadPage:
+        def get_text(self, *args, **kwargs):
+            return ""
+
+    class _DeadDoc:
+        needs_pass = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def __iter__(self):
+            return iter([_DeadPage()])
+
+        def __len__(self):
+            return 1
+
+    fake = types.ModuleType("pymupdf")
+    fake.open = lambda *args, **kwargs: _DeadDoc()
+    saved = _sys.modules.get("pymupdf")
+    _sys.modules["pymupdf"] = fake
+    try:
+        text, _pages, method = _extract_pdf(pdf_path.read_bytes())
+        return len(text.strip()) > 500 and method != "pymupdf"
+    except Exception:  # noqa: BLE001
+        return False
+    finally:
+        if saved is not None:
+            _sys.modules["pymupdf"] = saved
+        else:
+            _sys.modules.pop("pymupdf", None)
 
 
 def _ocr_available() -> bool:
