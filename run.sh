@@ -28,6 +28,14 @@ if [ ! -f samples/job_description.pdf ]; then
   python scripts/generate_samples.py
 fi
 
+# Skip Streamlit's one-time "enter your email" welcome prompt. This writes the
+# same file Streamlit itself writes when you press Enter at that prompt, and
+# only if you have not already answered it.
+if [ ! -f "$HOME/.streamlit/credentials.toml" ]; then
+  mkdir -p "$HOME/.streamlit"
+  printf '[general]\nemail = ""\n' > "$HOME/.streamlit/credentials.toml"
+fi
+
 if [ ! -f .env ] && [ -f .env.example ]; then
   cp .env.example .env
   echo "==> Created .env — the app runs offline until you add an API key."

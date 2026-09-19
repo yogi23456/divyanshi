@@ -27,6 +27,12 @@ if not exist samples\job_description.pdf (
   python scripts\generate_samples.py
 )
 
+REM Skip Streamlit's one-time "enter your email" welcome prompt.
+if not exist "%USERPROFILE%\.streamlit\credentials.toml" (
+  if not exist "%USERPROFILE%\.streamlit" mkdir "%USERPROFILE%\.streamlit"
+  (echo [general]& echo email = "")> "%USERPROFILE%\.streamlit\credentials.toml"
+)
+
 if not exist .env if exist .env.example (
   copy /y .env.example .env >nul
   echo ==^> Created .env - the app runs offline until you add an API key.
