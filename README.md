@@ -55,9 +55,35 @@ contributed to the score.
 
 ---
 
+## Quick start
+
+Requires **Python 3.10+**. From the project folder:
+
+```bash
+# macOS / Linux
+./run.sh
+```
+```bat
+REM Windows
+run.bat
+```
+
+That creates a virtual environment on first run, installs everything, generates
+the sample data, and opens the app at **<http://localhost:8501>**. Press Ctrl+C
+to stop it. Subsequent runs reuse the environment and start in seconds.
+
+The app works immediately with no API key — it runs on the built-in offline
+analyzer. Add a key to `.env` later to switch to an LLM (see
+[Changing the LLM provider](#changing-the-llm-provider)).
+
+To try it straight away, upload `samples/job_description.pdf` in step 1 and
+everything in `samples/resumes/` in step 2.
+
+---
+
 ## Installation
 
-Requires **Python 3.10+**.
+Prefer to do it by hand, or already have an environment? Requires **Python 3.10+**.
 
 ```bash
 git clone <your-repo-url>
@@ -480,6 +506,7 @@ With an LLM provider, analysis time is dominated by the API: roughly
 
 ```
 app.py                        Streamlit recruiter dashboard
+run.sh / run.bat              One-command start (venv + install + launch)
 requirements.txt
 .env.example                  Configuration template
 .gitignore                    Excludes .env, uploads/, outputs/, .cache/
